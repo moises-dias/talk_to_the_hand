@@ -1,35 +1,34 @@
-int LEDs[7] =   {19, 16, 23, 4, 17, 12, 13};
-int sensors[7] =   {25, 32, 33, 34, 35, 26, 27};
-// int LEDs[] =   {19, 15, 23, 4, 5, 12, 13, 16, 17};
-// int sensors[] =   {25, 26, 27, 32, 33, 34, 35, 16, 17};
-int num_sensors = 7;
-int max_vals[7] = {0, 0, 0, 0, 0, 0, 0};   // colocar isso dentro do calibrar, só vai precisar do threshold
-int min_vals[7] = {0, 0, 0, 0, 0, 0, 0};    // colocar isso dentro do calibrar, só vai precisar do threshold
-long avg_vals[7] = {0, 0, 0, 0, 0, 0, 0}; // colocar isso dentro do calibrar, só vai precisar do threshold
-int threshold[7] = {0, 0, 0, 0, 0, 0, 0};
-int values[7][200];  // colocar isso dentro do calibrar
+// imports para o aceletrometro/giroscopio
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+const int num_sensors = 7;                                       // numero de sensores flexíveis e de pressão 
+int sensors[num_sensors] =   {25, 32, 33, 34, 35, 26, 27};       // GPIO que serão utilizados pelos sensores flexíveis e de pressão
+int LEDs[num_sensors] =   {19, 16, 23, 4, 17, 12, 13};           // LEDs utilizados para debugar
+int threshold[num_sensors] = {0, 0, 0, 0, 0, 0, 0};              // limiar para considerar um sensor flexionado/pressionado, será preenchido na função calibrar
+
 bool calibrado = false;
 
-const int num_sensors_and_gy = 9; // quantidade de sensores e de eixos do giroscopio e acelerometro q serao usados
-const int total_signs = 28; //26 letras, apagar e espaço
+const int num_sensors_and_gy = 9;                          // 7 sensores, eixo X giroscopio e eixo X acelerometro
+const int total_signs = 28;                                // 26 letras, apagar e espaço
 
-// int g_pin = 5;
-int g_led_pin = 5;
-int g_reads_index = 7;
-float g_threshold = 3.0;
-int g_count = 0; // se for identificado o giro, manter ligado nas proximas 3 leituras
-int g_count_threshold = 2;
+int g_led_pin = 5;                                         // LED utilizado para debugar o giroscopio
+int g_reads_index = 7;                                     // índice do vetor reads para gravar o valor do giroscopio
+float g_threshold = 3.0;                                   // considerar que a mão está girando para valores acima de 3.0
+int g_count_threshold = 2;                                 // se for identificado o giro, manter ligado nas proximas 2 leituras
+int g_count = 0; 
 
-// int a_pin = 15;
-int a_led_pin = 15;
-int a_reads_index = 8;
-float a_threshold = 0.0;
+int a_led_pin = 15;                                        // LED utilizado para debugar o acelerometro
+int a_reads_index = 8;                                     // índice do vetor reads para gravar o valor do acelerometro
+float a_threshold = 0.0;                                   // valores positivos: mão para cima, negativos: mão para baixo
 
-int reads[num_sensors_and_gy] = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // 5 dedos, 2 pressao, giroscopio X e acelerometro X
-int last_reads[num_sensors_and_gy] = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // 5 dedos, 2 pressao, giroscopio X e acelerometro X
+int reads[num_sensors_and_gy] = {0, 0, 0, 0, 0, 0, 0, 0, 0};        // guarda a leitura atual dos sensores
+int last_reads[num_sensors_and_gy] = {0, 0, 0, 0, 0, 0, 0, 0, 0};   // guarda a ultima leitura dos sensores
+int last_printed[num_sensors_and_gy] = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // ultima letra enviada para o aplicativo
 
+// os dois vetores abaixo são relacionados: signs_index[0] == letra 'a', signs[0] == valores para formar a letra 'a'
 char signs_index[total_signs] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '.', ','};
-
 int signs[total_signs][num_sensors_and_gy] = {
   {1, 0, 0, 0, 0, 0, 0, 0, 0}, // a
   {0, 1, 0, 0, 0, 0, 0, 0, 0}, // b
@@ -57,32 +56,28 @@ int signs[total_signs][num_sensors_and_gy] = {
   {1, 1, 1, 1, 1, 0, 0, 0, 0}, // x
   {0, 1, 1, 1, 0, 0, 0, 0, 0}, // y
   {1, 0, 1, 1, 1, 0, 0, 0, 0}, // z
-  {0, 0, 0, 0, 0, 0, 0, 0, 0}, // apagar
-  {0, 0, 0, 0, 0, 0, 0, 0, 0}  // espaço
+  {0, 0, 0, 0, 0, 0, 0, 0, 0}, // . (apagar)
+  {0, 0, 0, 0, 0, 0, 0, 0, 0}  // , (espaço)
 };
 
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <Wire.h>
-
-Adafruit_MPU6050 mpu;
+Adafruit_MPU6050 mpu;          // sensor acelerometro/giroscopio
 
 void setup(void) {
-  pinMode(14, INPUT_PULLUP);
-  for (int i = 0; i < num_sensors; i++) {
+  pinMode(14, INPUT_PULLUP);                            // pino 14 é um botão para controlar quando calibrar
+  for (int i = 0; i < num_sensors; i++) {               // seta os pinos dos sensores para output
     pinMode(LEDs[i], OUTPUT);
     digitalWrite(LEDs[i], LOW);
   }
-  pinMode(5, OUTPUT);
-  digitalWrite(5, LOW);
-  pinMode(15, OUTPUT);
-  digitalWrite(15, LOW);
+  pinMode(g_led_pin, OUTPUT);
+  digitalWrite(g_led_pin, LOW);
+  pinMode(a_led_pin, OUTPUT);
+  digitalWrite(a_led_pin, LOW);
 
   Serial.begin(9600);
   while (!Serial)
     delay(10);
 
-  if (!mpu.begin()) {
+  if (!mpu.begin()) {                                   // inicia e configura o sensor acelerometro/giroscopio  
     Serial.println("Failed to find MPU6050 chip");
     while (1) {
       delay(10);
@@ -96,22 +91,28 @@ void setup(void) {
 }
 
 void loop() {
-  if (digitalRead(14) == LOW)
+  if (digitalRead(14) == LOW)                                       //calibra os sensores ao clicar no botão do GPIO 14
     calibrar();
 
   if (calibrado)
   {
-    take_readings();
+    take_readings();                                                // take readings mapeia o vetor reads com as leituras atuais
 
-    if (iguais(reads, last_reads, num_sensors_and_gy)) {
-      for (int i = 0; i < total_signs; i++) {
-        if (iguais(reads, signs[i], num_sensors_and_gy)) {
-          Serial.println(signs_index[i]);
+    if (!iguais(reads, last_printed, num_sensors_and_gy)) {         // se o que foi lido é diferente da ultima letra enviada para o app
+      if (iguais(reads, last_reads, num_sensors_and_gy)) {          // se o que foi lido é igual ao que foi lido a x milisegundos (confirmar que é uma leitura e não ruido)
+        for (int i = 0; i < total_signs; i++) {
+          if (iguais(reads, signs[i], num_sensors_and_gy)) {        // procura a letra lida no vetor signs
+            Serial.println(signs_index[i]);
+            for (int i = 0; i < num_sensors_and_gy; i++) {
+              last_printed[i] = reads[i];                           // atualiza o last_printed com a letra enviada para o app
+            }
+            break;                                                  // não é necessário realizar mais testes após identificar a letra
+          }
         }
       }
     }
 
-    for (int i = 0; i < num_sensors_and_gy; i++) {
+    for (int i = 0; i < num_sensors_and_gy; i++) {                  // atualiza o vetor last_reads com a ultima leitura realizada
       last_reads[i] = reads[i];
     }
 
@@ -123,7 +124,11 @@ void loop() {
 void calibrar() {
   Serial.println("calibrando");
   bool found = false;
-  int qt_found[7] = {0, 0, 0, 0, 0, 0, 0};
+  int qt_found[num_sensors] = {0, 0, 0, 0, 0, 0, 0};
+  int max_vals[num_sensors] = {0, 0, 0, 0, 0, 0, 0};  
+  int min_vals[num_sensors] = {0, 0, 0, 0, 0, 0, 0};   
+  long avg_vals[num_sensors] = {0, 0, 0, 0, 0, 0, 0};
+  int values[num_sensors][200]; 
 
   for (int i = 0; i < 200; i++) {
     for (int finger = 0; finger < num_sensors; finger ++) {
@@ -169,7 +174,6 @@ void calibrar() {
     Serial.println(avg_vals[finger]);
   }
 
-  // criando o threshold
   for (int finger = 0; finger < num_sensors; finger ++) {
     threshold[finger] = (avg_vals[finger] + min_vals[finger]) / 2;
   }
@@ -209,9 +213,9 @@ void take_readings() {
   if (g.gyro.x > g_threshold) {
     reads[g_reads_index] = 1;
     digitalWrite(g_led_pin, HIGH);
-    g_count = g_count_threshold;
+    g_count = g_count_threshold; 
   }
-  else if (g_count > 0) {
+  else if (g_count > 0) { // como o giroscópio é "rapido" temos que garantir que ao identificar um giro ele dure mais de uma leitura
     g_count = g_count - 1;
   }
   else {
