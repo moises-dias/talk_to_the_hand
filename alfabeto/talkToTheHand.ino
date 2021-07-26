@@ -3,14 +3,26 @@
 // leds do display de 7 segmentos
 int LEDs[] = {22,23,1,3,19,18,5,21};
 // pinos analógicos para leitura
-int analogPins[] = {13, 12, 14, 27, 26}; // leds para a leitura dos resistores
-// valores de cada dedo
-int dedos[] = {0, 0, 0, 0, 0};
-int dedos_final[] = {0, 0, 0, 0, 0};
-// valor do giroscopio -> eixo y
+int analogPins[] = {13, 12, 14, 27, 26}; // leds para a leitura dos resistores flex
+// valor do giroscopio -> eixo y (em cima e em baixo)
 int eixoy = 0;
 int eixoy_final = 0;
 int eixoy_port = 25;
+// valor do giroscopio -> eixo z (giro da mão)
+int eixoz = 0;
+int eixoz_final = 0;
+int eixoz_port = 33;
+// valores de cada dedo
+int dedos[] = {0, 0, 0, 0, 0};
+int dedos_final[] = {0, 0, 0, 0, 0};
+// valor do sensor de pressão do dedão e indicador
+int dedao = 0;
+int dedao_final = 0;
+int dedao_port = 25;
+// valor do sensor de pressão do dedão e indicador
+int indicador = 0;
+int indicador_final = 0;
+int indicador_port = 25;
 // referência que define se o dedo está dobrado ou não
 int ref = 500;
 
@@ -130,11 +142,20 @@ void loop() {
     else {
       eixoy = -1;
     }
+    if(analogRead(eixoz_port) > ref) {
+      eixoz = 1;
+    }
+    else {
+      eixoz = 0;
+    }
   }
+  dedao = eixoy;
+  indicador = eixoy;
   printaVetor(dedos, 5);
   Serial.println(eixoy);
+  Serial.println(eixoz);
   // esperando para ver se o dedo continua dobrado e se não é sinal intermediário
-  delay(2000); // ms
+  delay(1000); // ms
   // pegando dados uma segunda vez
   for (int i=0 ; i<5 ; i++ ){
     if(analogRead(analogPins[i]) > ref) {
@@ -149,11 +170,23 @@ void loop() {
     else {
       eixoy_final = -1;
     }
+    if(analogRead(eixoz_port) > ref) {
+      eixoz_final = 1;
+    }
+    else {
+      eixoz_final = 0;
+    }
   }
+  dedao_final = eixoy_final;
+  indicador_final = eixoy_final;
   printaVetor(dedos_final, 5);
   Serial.println(eixoy);
-  // verificando se os valores coletados batem
+  Serial.println(eixoz);
+  // verificando se os valores coletados batem, menos o eixo z, esse pega apenas maior valor
   if(eixoy == eixoy_final and iguais(dedos, dedos_final, 5) ){ // eh um sinal e não um intermediário
+    if(eixoz_final > eixoz) { // pega o maior valor que indica a rotação da mão
+      eixoz = eixoz_final;
+    }
     if(iguais(dedos, sinala, 5)){
        Serial.println("a");
        escreve(a, 8); // tamanho do vetor do display e não dos dedos
@@ -162,27 +195,27 @@ void loop() {
       Serial.println("b");
        escreve(b, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(iguais(dedos, sinalc, 5)){
+    else if( eixoz == 0 and indicador == 1 and iguais(dedos, sinalc, 5)){
       Serial.println("c");
        escreve(c, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(eixoy == 1 and iguais(dedos, sinald, 5)){
+    else if(eixoy == 1 and eixoz == 0 and iguais(dedos, sinald, 5)){
       Serial.println("d");
        escreve(d, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(iguais(dedos, sinale, 5)){
+    else if(eixoz == 0 and iguais(dedos, sinale, 5)){
       Serial.println("e");
        escreve(e, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(iguais(dedos, sinalf, 5)){
+    else if(dedao == 1 and indicador == 0 and iguais(dedos, sinalf, 5)){
       Serial.println("f");
        escreve(f, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(eixoy == 1 and iguais(dedos, sinalg, 5)){
+    else if(eixoy == 1 and eixoz == 0 and iguais(dedos, sinalg, 5)){
       Serial.println("g");
        escreve(g, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(eixoy == 1 and iguais(dedos, sinalh, 5)){
+    else if(dedao == 1 and eixoy == 1 and eixoz == 1 and iguais(dedos, sinalh, 5)){
       Serial.println("h");
        escreve(h, 8); // tamanho do vetor do display e não dos dedos
     }
@@ -194,7 +227,7 @@ void loop() {
       Serial.println("j");
        escreve(j, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(eixoy == 1 and iguais(dedos, sinalk, 5)){
+    else if(dedao == 1 and eixoy == 1 and iguais(dedos, sinalk, 5)){
       Serial.println("k");
        escreve(k, 8); // tamanho do vetor do display e não dos dedos
     }
@@ -234,11 +267,11 @@ void loop() {
       Serial.println("t");
        escreve(t, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(eixoy == 1 and iguais(dedos, sinalu, 5)){
+    else if(indicador == 1 and eixoy == 1 and iguais(dedos, sinalu, 5)){
       Serial.println("u");
        escreve(u, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(eixoy == 1 and iguais(dedos, sinalv, 5)){
+    else if(indicador == 0 and eixoy == 1 and iguais(dedos, sinalv, 5)){
       Serial.println("v");
        escreve(v, 8); // tamanho do vetor do display e não dos dedos
     }
@@ -246,7 +279,7 @@ void loop() {
       Serial.println("w");
        escreve(w, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(iguais(dedos, sinalx, 5)){
+    else if(eixoz == 1 and iguais(dedos, sinalx, 5)){
       Serial.println("x");
        escreve(x, 8); // tamanho do vetor do display e não dos dedos
     }
@@ -254,7 +287,7 @@ void loop() {
       Serial.println("y");
        escreve(y, 8); // tamanho do vetor do display e não dos dedos
     }
-    else if(iguais(dedos, sinalz, 5)){
+    else if(eixoz == 1 and iguais(dedos, sinalz, 5)){
       Serial.println("z");
        escreve(z, 8); // tamanho do vetor do display e não dos dedos
     }
