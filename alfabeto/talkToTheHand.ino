@@ -145,10 +145,10 @@ void loop() {
   }
   printaVetor(sensores, sensores_size);
   // comparando os valores dos sensores
-  if(iguais(sensores, sensores_final, sensores_size) ){ /* eh um sinal e não um intermediário */
-    if(sensores_final[8] > sensores[8]) { // pega o maior valor que indica a rotação da mão
+  if(sensores_final[8] > sensores[8]) { // pega o maior valor que indica a rotação da mão
       sensores[8] = sensores_final[8];
-    }
+  }
+  if(iguais(sensores, sensores_final, sensores_size) ){ /* eh um sinal e não um intermediário */
     if(iguais(sensores, sinala, sensores_size)){
        Serial.println("a");
     }
